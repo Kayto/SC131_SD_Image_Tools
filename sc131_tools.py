@@ -1,5 +1,8 @@
 """
 sc131_tools.py - RomWBW SC131 SD Card Tools
+Author:   Kayto
+Date:     2026-03-02
+License:  MIT License - see LICENSE file for details
 Requires: Python 3.x  (no extra packages)
 Usage:    python sc131_tools.py
 """
