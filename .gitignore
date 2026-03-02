@@ -1,0 +1,19 @@
+# Extracted CP/M image files
+extracted/**/*.img
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Archives
+*.zip
+*.7z
+
+# Temp files created by sc131_tools.py
+_build_temp.img
+_extra_slice.img
+_extra_stage/
+_scan_tmp.img
+romwbw/
+diskdefs
+build/*.img

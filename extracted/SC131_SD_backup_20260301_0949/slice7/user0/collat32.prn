@@ -1,0 +1,355 @@
+
+
+                ; CP/M-80 2.2 .COM (8080) ? DRI ASM.COM friendly
+                ; 32-bit Collatz explorer (HEX output):
+                ;   N starts at 2 and increments forever (32-bit)
+                ;   Collatz value is 32-bit
+                ; Prints:  N=XXXXXXXX  STEPS=YYYYYYYY
+                ; ESC exits (BDOS 11 poll + BDOS 1 read)
+                ; If odd-step would overflow 32-bit (n > 0x55555554), prints "  OVF" and moves on.
+                ;
+                ; Key robustness change:
+                ;   NO "LABEL+K" addressing anywhere for variables.
+                ;   Every byte has its own label (CUR0..CUR3 etc).
+                
+ 0100                   ORG     100H
+ 0005 =         BDOS    EQU     0005H
+                
+                ; -------------------------
+                ; Start
+                ; -------------------------
+                START:  ; STN = 2 (32-bit LE)
+ 0100 AF                XRA     A
+ 0101 322C03            STA     STN0
+ 0104 322D03            STA     STN1
+ 0107 322E03            STA     STN2
+ 010A 322F03            STA     STN3
+ 010D 3E02              MVI     A,2
+ 010F 322C03            STA     STN0
+                
+                NXST:   ; poll for ESC
+ 0112 CDDC02            CALL    KPOLL
+ 0115 B7                ORA     A
+ 0116 CA2301            JZ      NOKEY
+ 0119 0E01              MVI     C,1
+ 011B CD0500            CALL    BDOS
+ 011E FE1B              CPI     1BH
+ 0120 CA6102            JZ      EXIT
+                NOKEY:
+                
+                        ; Print "N=" + STN (hex) + "  STEPS="
+ 0123 111A03            LXI     D,TXTN
+ 0126 CDC502            CALL    PSTR
+ 0129 212C03            LXI     H,STN0
+ 012C CDE202            CALL    PH32
+ 012F 111D03            LXI     D,TXTS
+ 0132 CDC502            CALL    PSTR
+                
+                        ; CUR = STN
+ 0135 3A2C03            LDA     STN0
+ 0138 323003            STA     CUR0
+ 013B 3A2D03            LDA     STN1
+ 013E 323103            STA     CUR1
+ 0141 3A2E03            LDA     STN2
+ 0144 323203            STA     CUR2
+ 0147 3A2F03            LDA     STN3
+ 014A 323303            STA     CUR3
+                
+                        ; STP = 0
+ 014D AF                XRA     A
+ 014E 323803            STA     STP0
+ 0151 323903            STA     STP1
+ 0154 323A03            STA     STP2
+ 0157 323B03            STA     STP3
+                
+                STEP:   ; if CUR == 1 then done
+ 015A 3A3303            LDA     CUR3
+ 015D B7                ORA     A
+ 015E C27701            JNZ     NTONE
+ 0161 3A3203            LDA     CUR2
+ 0164 B7                ORA     A
+ 0165 C27701            JNZ     NTONE
+ 0168 3A3103            LDA     CUR1
+ 016B B7                ORA     A
+ 016C C27701            JNZ     NTONE
+ 016F 3A3003            LDA     CUR0
+ 0172 FE01              CPI     1
+ 0174 CA5202            JZ      DONE
+                
+                NTONE:  ; odd/even test
+ 0177 3A3003            LDA     CUR0
+ 017A E601              ANI     01H
+ 017C C29F01            JNZ     ODD
+                
+                ; ---- EVEN: CUR = CUR / 2 (32-bit shift right)
+ 017F 3A3303    EVEN:   LDA     CUR3
+ 0182 B7                ORA     A           ; clear CY
+ 0183 1F                RAR
+ 0184 323303            STA     CUR3
+ 0187 3A3203            LDA     CUR2
+ 018A 1F                RAR
+ 018B 323203            STA     CUR2
+ 018E 3A3103            LDA     CUR1
+ 0191 1F                RAR
+ 0192 323103            STA     CUR1
+ 0195 3A3003            LDA     CUR0
+ 0198 1F                RAR
+ 0199 323003            STA     CUR0
+ 019C C32A02            JMP     INCST
+                
+                ; ---- ODD: overflow guard then CUR = 3*CUR + 1
+ 019F CD8502    ODD:    CALL    CMPO        ; CY=1 if CUR <= 0x55555554
+ 01A2 D21E02            JNC     OVF         ; if > max, would overflow on 3n+1
+                
+                        ; SAV = CUR
+ 01A5 3A3003            LDA     CUR0
+ 01A8 323403            STA     SAV0
+ 01AB 3A3103            LDA     CUR1
+ 01AE 323503            STA     SAV1
+ 01B1 3A3203            LDA     CUR2
+ 01B4 323603            STA     SAV2
+ 01B7 3A3303            LDA     CUR3
+ 01BA 323703            STA     SAV3
+                
+                        ; CUR = 2*CUR (32-bit shift left)
+ 01BD AF                XRA     A           ; clear carry
+ 01BE 3A3003            LDA     CUR0
+ 01C1 17                RAL
+ 01C2 323003            STA     CUR0
+ 01C5 3A3103            LDA     CUR1
+ 01C8 17                RAL
+ 01C9 323103            STA     CUR1
+ 01CC 3A3203            LDA     CUR2
+ 01CF 17                RAL
+ 01D0 323203            STA     CUR2
+ 01D3 3A3303            LDA     CUR3
+ 01D6 17                RAL
+ 01D7 323303            STA     CUR3
+                
+                        ; CUR = CUR + SAV  (=> 3x)
+ 01DA 3A3003            LDA     CUR0
+V01DD 56                ADD     SAV0
+ 01DE 323003            STA     CUR0
+ 01E1 3A3103            LDA     CUR1
+V01E4 57                ADC     SAV1
+ 01E5 323103            STA     CUR1
+ 01E8 3A3203            LDA     CUR2
+V01EB 56                ADC     SAV2
+ 01EC 323203            STA     CUR2
+ 01EF 3A3303            LDA     CUR3
+V01F2 57                ADC     SAV3
+ 01F3 323303            STA     CUR3
+                
+                        ; +1 (32-bit)
+ 01F6 3A3003            LDA     CUR0
+ 01F9 3C                INR     A
+ 01FA 323003            STA     CUR0
+ 01FD C22A02            JNZ     INCST
+ 0200 3A3103            LDA     CUR1
+ 0203 3C                INR     A
+ 0204 323103            STA     CUR1
+ 0207 C22A02            JNZ     INCST
+ 020A 3A3203            LDA     CUR2
+ 020D 3C                INR     A
+ 020E 323203            STA     CUR2
+ 0211 C22A02            JNZ     INCST
+ 0214 3A3303            LDA     CUR3
+ 0217 3C                INR     A
+ 0218 323303            STA     CUR3
+ 021B C32A02            JMP     INCST
+                
+                OVF:    ; print "  OVF" and finish this N
+ 021E 112603            LXI     D,TXTO
+ 0221 CDC502            CALL    PSTR
+ 0224 CDD102            CALL    CRLF
+ 0227 C35B02            JMP     NXTN
+                
+                ; ---- step counter ++ and loop
+ 022A 3A3803    INCST:  LDA     STP0
+ 022D 3C                INR     A
+ 022E 323803            STA     STP0
+ 0231 C25A01            JNZ     STEP
+ 0234 3A3903            LDA     STP1
+ 0237 3C                INR     A
+ 0238 323903            STA     STP1
+ 023B C25A01            JNZ     STEP
+ 023E 3A3A03            LDA     STP2
+ 0241 3C                INR     A
+ 0242 323A03            STA     STP2
+ 0245 C25A01            JNZ     STEP
+ 0248 3A3B03            LDA     STP3
+ 024B 3C                INR     A
+ 024C 323B03            STA     STP3
+ 024F C35A01            JMP     STEP
+                
+                DONE:   ; print step count (hex) then CRLF
+ 0252 213803            LXI     H,STP0
+ 0255 CDE202            CALL    PH32
+ 0258 CDD102            CALL    CRLF
+                
+                NXTN:   ; STN++
+ 025B CD6502            CALL    INCN
+ 025E C31201            JMP     NXST
+                
+ 0261 CDD102    EXIT:   CALL    CRLF
+ 0264 C9                RET
+                
+                ; -------------------------
+                ; INCN: increment STN (32-bit)
+                ; -------------------------
+ 0265 3A2C03    INCN:   LDA     STN0
+ 0268 3C                INR     A
+ 0269 322C03            STA     STN0
+ 026C C0                RNZ
+ 026D 3A2D03            LDA     STN1
+ 0270 3C                INR     A
+ 0271 322D03            STA     STN1
+ 0274 C0                RNZ
+ 0275 3A2E03            LDA     STN2
+ 0278 3C                INR     A
+ 0279 322E03            STA     STN2
+ 027C C0                RNZ
+ 027D 3A2F03            LDA     STN3
+ 0280 3C                INR     A
+ 0281 322F03            STA     STN3
+ 0284 C9                RET
+                
+                ; -------------------------
+                ; CMPO: CY=1 if CUR <= 0x55555554 else CY=0
+                ; (Compare MSB -> LSB)
+                ; -------------------------
+ 0285 3A3303    CMPO:   LDA     CUR3
+ 0288 FE55              CPI     055H
+ 028A DAB402            JC      CMOK
+ 028D C2B102            JNZ     CMBAD
+                
+ 0290 3A3203            LDA     CUR2
+ 0293 FE55              CPI     055H
+ 0295 DAB402            JC      CMOK
+ 0298 C2B102            JNZ     CMBAD
+                
+ 029B 3A3103            LDA     CUR1
+ 029E FE55              CPI     055H
+ 02A0 DAB402            JC      CMOK
+ 02A3 C2B102            JNZ     CMBAD
+                
+ 02A6 3A3003            LDA     CUR0
+ 02A9 FE54              CPI     054H
+ 02AB DAB402            JC      CMOK
+ 02AE CAB402            JZ      CMOK
+                
+ 02B1 37        CMBAD:  STC                 ; CY=1
+ 02B2 3F                CMC                 ; CY=0
+ 02B3 C9                RET
+                
+ 02B4 37        CMOK:   STC                 ; CY=1
+ 02B5 C9                RET
+                
+                ; -------------------------
+                ; BDOS helpers (preserve regs)
+                ; -------------------------
+ 02B6 F5        PCH:    PUSH    PSW
+ 02B7 C5                PUSH    B
+ 02B8 D5                PUSH    D
+ 02B9 E5                PUSH    H
+ 02BA 5F                MOV     E,A
+ 02BB 0E02              MVI     C,2
+ 02BD CD0500            CALL    BDOS
+ 02C0 E1                POP     H
+ 02C1 D1                POP     D
+ 02C2 C1                POP     B
+ 02C3 F1                POP     PSW
+ 02C4 C9                RET
+                
+ 02C5 C5        PSTR:   PUSH    B
+ 02C6 D5                PUSH    D
+ 02C7 E5                PUSH    H
+ 02C8 0E09              MVI     C,9
+ 02CA CD0500            CALL    BDOS
+ 02CD E1                POP     H
+ 02CE D1                POP     D
+ 02CF C1                POP     B
+ 02D0 C9                RET
+                
+ 02D1 3E0D      CRLF:   MVI     A,0DH
+ 02D3 CDB602            CALL    PCH
+ 02D6 3E0A              MVI     A,0AH
+ 02D8 CDB602            CALL    PCH
+ 02DB C9                RET
+                
+ 02DC 0E0B      KPOLL:  MVI     C,11
+ 02DE CD0500            CALL    BDOS
+ 02E1 C9                RET
+                
+                ; -------------------------
+                ; PH32: print 32-bit value at HL (LE) as 8 hex digits
+                ; (prints MSB first)
+                ; -------------------------
+ 02E2 C5        PH32:   PUSH    B
+ 02E3 E5                PUSH    H
+ 02E4 23                INX     H
+ 02E5 23                INX     H
+ 02E6 23                INX     H
+ 02E7 7E                MOV     A,M
+ 02E8 CDFD02            CALL    HX8
+ 02EB 2B                DCX     H
+ 02EC 7E                MOV     A,M
+ 02ED CDFD02            CALL    HX8
+ 02F0 2B                DCX     H
+ 02F1 7E                MOV     A,M
+ 02F2 CDFD02            CALL    HX8
+ 02F5 2B                DCX     H
+ 02F6 7E                MOV     A,M
+ 02F7 CDFD02            CALL    HX8
+ 02FA E1                POP     H
+ 02FB C1                POP     B
+ 02FC C9                RET
+                
+ 02FD F5        HX8:    PUSH    PSW
+ 02FE 0F                RRC
+ 02FF 0F                RRC
+ 0300 0F                RRC
+ 0301 0F                RRC
+ 0302 E60F              ANI     0FH
+ 0304 CD0A03            CALL    HXN
+ 0307 F1                POP     PSW
+ 0308 E60F              ANI     0FH
+                        ; fall through
+                
+ 030A FE0A      HXN:    CPI     0AH
+ 030C DA1403            JC      HXD
+ 030F C637              ADI     ('A'-0AH)
+ 0311 C31603            JMP     HXO
+ 0314 C630      HXD:    ADI     '0'
+ 0316 CDB602    HXO:    CALL    PCH
+ 0319 C9                RET
+                
+                ; -------------------------
+                ; Data
+                ; -------------------------
+ 031A 4E3D24    TXTN:   DB      'N=','$'
+ 031D 2020535445TXTS:   DB      '  STEPS=','$'
+ 0326 20204F5646TXTO:   DB      '  OVF','$'
+                
+                ; 32-bit little-endian variables (explicit byte labels)
+ 032C           STN0:   DS      1
+ 032D           STN1:   DS      1
+ 032E           STN2:   DS      1
+ 032F           STN3:   DS      1
+                
+ 0330           CUR0:   DS      1
+ 0331           CUR1:   DS      1
+ 0332           CUR2:   DS      1
+ 0333           CUR3:   DS      1
+                
+ 0334           SAV0:   DS      1
+ 0335           SAV1:   DS      1
+ 0336           SAV2:   DS      1
+ 0337           SAV3:   DS      1
+                
+ 0338           STP0:   DS      1
+ 0339           STP1:   DS      1
+ 033A           STP2:   DS      1
+ 033B           STP3:   DS      1
+                
+ 033C                   END     START

@@ -1,0 +1,32 @@
+
+
+ 0100           ORG 100H
+                
+                START:
+ 0100 3E20          MVI  A,20H          ; FIRST PRINTABLE
+                
+                PRINTLOOP:
+ 0102 F5            PUSH PSW            ; SAVE A+FLAGS (LOOP COUNTER)
+ 0103 5F            MOV  E,A            ; CHAR -> E
+ 0104 0E02          MVI  C,2            ; BDOS CONSOLE OUTPUT
+ 0106 CD0500        CALL 5
+ 0109 F1            POP  PSW            ; RESTORE A
+                
+ 010A 3C            INR  A
+ 010B FE80          CPI  80H
+ 010D C20201        JNZ  PRINTLOOP
+                
+                    ; NEWLINE (OPTIONAL BUT HELPS VISIBILITY ON SOME TERMINALS)
+ 0110 1E0D          MVI  E,0DH
+ 0112 0E02          MVI  C,2
+ 0114 CD0500        CALL 5
+ 0117 1E0A          MVI  E,0AH
+ 0119 0E02          MVI  C,2
+ 011B CD0500        CALL 5
+                
+                    ; WAIT FOR KEY
+ 011E 0E01          MVI  C,1
+ 0120 CD0500        CALL 5
+ 0123 C9            RET
+                
+ 0124           END START

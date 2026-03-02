@@ -1,0 +1,16 @@
+
+
+                ; SIMPLE CP/M HELLO WORLD PROGRAM IN ASM
+O               ; THIS PROGRAM PRINTS 'HELLO, WORLD!' TO THE CONSOLE
+                
+ 0100           ORG 100H           ; CP/M PROGRAM LOAD ADDRESS
+                
+                START:
+ 0100 0E09          MVI  C, 9       ; BDOS FUNCTION 9: PRINT STRING
+ 0102 110901        LXI  D, MSG     ; DE POINTS TO STRING
+ 0105 CD0500        CALL 5          ; CALL BDOS
+ 0108 C9            RET             ; RETURN TO CP/M
+                
+                MSG:
+ 0109 48454C4C4F    DB 'HELLO, WORLD!$'
+
